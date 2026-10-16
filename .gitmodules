@@ -1,0 +1,21 @@
+[submodule "dep/BSVTools"]
+	path = dep/BSVTools
+	url = https://github.com/timksf/BSVTools.git
+[submodule "dep/bluefabric"]
+	path = dep/bluefabric
+	url = https://github.com/timksf/bluefabric.git
+[submodule "dep/bluecsr"]
+	path = dep/bluecsr
+	url = https://github.com/timksf/bluecsr.git
+[submodule "dep/blueuart"]
+	path = dep/blueuart
+	url = https://github.com/timksf/blueuart.git
+[submodule "dep/bluegpio"]
+	path = dep/bluegpio
+	url = https://github.com/timksf/bluegpio.git
+[submodule "dep/bluexlnx"]
+	path = dep/bluexlnx
+	url = https://github.com/timksf/bluexlnx.git
+[submodule "dep/bluej"]
+	path = dep/bluej
+	url = https://github.com/timksf/bluej
