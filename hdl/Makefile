@@ -57,7 +57,8 @@ CXX_NO_OPT := 1
 
 # Custom TCL flow
 # PART := xcku3p-ffvb676-2-e
-# SCRIPT := $(CURDIR)/synth.tcl
+PART=xc7a200tfbg484-2
+SCRIPT := $(CURDIR)/src/script/synth.tcl
 
 # Do not change: Load libraries such as BlueAXI or BlueLib
 ifneq ("$(wildcard $(CURDIR)/libraries/*/*.mk)", "")
