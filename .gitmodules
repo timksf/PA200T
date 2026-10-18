@@ -19,3 +19,6 @@
 [submodule "dep/bluej"]
 	path = dep/bluej
 	url = https://github.com/timksf/bluej
+[submodule "dep/BlueAXI"]
+	path = dep/BlueAXI
+	url = https://github.com/timksf/BlueAXI

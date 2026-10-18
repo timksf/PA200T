@@ -7,9 +7,10 @@ set_property BITSTREAM.CONFIG.SPI_BUSWIDTH 4 [current_design]
 set_property BITSTREAM.CONFIG.SPI_FALL_EDGE Yes [current_design]
 
 create_clock -period 5 -name clk_200 [get_ports CLK_clk_p]
-create_clock -period 100 -name jtag_tck [get_nets {*bscane2$TCK}]
+create_clock -period 100 -name jtag_tck3 [get_nets {*bscan3$TCK}]
+create_clock -period 100 -name jtag_tck4 [get_nets {*bscan4$TCK}]
 
-set_clock_groups -group clk_100mhz -group jtag_tck -asynchronous
+set_clock_groups -asynchronous -group [get_clocks clk_200] -group [get_clocks {jtag_tck3 jtag_tck4}]
 
 set_property -dict {PACKAGE_PIN R4 IOSTANDARD DIFF_SSTL15} [get_ports CLK_clk_p]
 set_property -dict {PACKAGE_PIN T4 IOSTANDARD DIFF_SSTL15} [get_ports CLK_clk_n]
