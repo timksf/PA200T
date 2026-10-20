@@ -22,3 +22,6 @@
 [submodule "dep/BlueAXI"]
 	path = dep/BlueAXI
 	url = https://github.com/timksf/BlueAXI
+[submodule "dep/verilog-ethernet"]
+	path = dep/verilog-ethernet
+	url = https://github.com/alexforencich/verilog-ethernet.git
