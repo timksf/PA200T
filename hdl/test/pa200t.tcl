@@ -5,7 +5,7 @@ adapter speed 1000
 
 transport select jtag
 
-source bus.tcl
+source helpers.tcl
 
 jtag newtap pa200t tap -irlen 6 -expected-id 0x13636093
 

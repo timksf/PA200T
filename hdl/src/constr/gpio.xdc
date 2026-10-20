@@ -1,5 +1,3 @@
-
-
 set_property -dict {PACKAGE_PIN F13 IOSTANDARD LVCMOS33} [get_ports {GPIO_0}]
 set_property -dict {PACKAGE_PIN E16 IOSTANDARD LVCMOS33} [get_ports {GPIO_1}]
 set_property -dict {PACKAGE_PIN F14 IOSTANDARD LVCMOS33} [get_ports {GPIO_2}]

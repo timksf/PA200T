@@ -7,6 +7,7 @@ set constr_dir [file join $script_dir .. constr]
 read_xdc [file join $constr_dir system.xdc]
 read_xdc [file join $constr_dir gpio.xdc]
 read_xdc [file join $constr_dir uart.xdc]
+read_xdc [file join $constr_dir jtag.xdc]
 
 synth_design -top $top_module
 puts "Finished synth_design"
