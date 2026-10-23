@@ -12,12 +12,13 @@ endinterface
 
 (* no_default_clock *)
 module mkPA200T_PLL#(Clock clk_200)(PA200T_PLL_ifc);
-    PLLE2_ADV_Config cfg_pll = defaultValue;
-    cfg_pll.p_CLKIN1_PERIOD = 5.0;
-    cfg_pll.p_CLKFBOUT_MULT = 5;
-    cfg_pll.p_CLKOUT0_DIVIDE = 8;
-    cfg_pll.p_COMPENSATION = "INTERNAL";
-    cfg_pll.p_IS_RST_INVERTED = 1;
+    //200/8*5=125
+    PLLE2_ADV_Config cfg_pll    = defaultValue;
+    cfg_pll.p_CLKIN1_PERIOD     = 5.0;
+    cfg_pll.p_CLKFBOUT_MULT     = 5;
+    cfg_pll.p_CLKOUT0_DIVIDE    = 8;
+    cfg_pll.p_COMPENSATION      = "INTERNAL";
+    cfg_pll.p_IS_RST_INVERTED   = 1;
 
     let sys_rst         <- exposeCurrentReset;
 
