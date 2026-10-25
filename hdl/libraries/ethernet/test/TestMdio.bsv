@@ -50,6 +50,7 @@ module mkTestMdio(Empty);
     Reg#(Bit#(16)) rg_answer <- mkReg('ha55a);
     Reg#(Bit#(16)) rg_period <- mkReg(4);
     Reg#(Bool)     rg_abort  <- mkReg(False);
+    Reg#(Bit#(4)) rg_command_strb <- mkReg(0);
     Reg#(Bit#(8))  rg_high_age <- mkReg(0);
     Reg#(Bit#(8))  rg_phy_delay <- mkReg(0);
 
@@ -125,12 +126,24 @@ module mkTestMdio(Empty);
         mdio_write(i_dut.csr, 'h08, 0, 'hf, CSR_SLVERR);
         mdio_write(i_dut.csr, 'h08, 3, 'hf, CSR_SLVERR);
         mdio_write(i_dut.csr, 'h08, 'h10001, 'hf, CSR_SLVERR);
-        mdio_write(i_dut.csr, 'h08, 2, 0, CSR_OKAY);
-        mdio_write(i_dut.csr, 'h08, 2, 2, CSR_OKAY);
-        action w_clear.send; endaction
-        mdio_write(i_dut.csr, 'h08, 2, 1, CSR_OKAY);
-        mdio_read(i_dut.csr, 'h0c, 1, CSR_OKAY);
+        // Every incomplete strobe mask, including zero, must be rejected.
+        for(rg_command_strb <= 0; rg_command_strb < 'hf; rg_command_strb <= rg_command_strb + 1) seq
+            mdio_write(i_dut.csr, 'h08, 2, rg_command_strb, CSR_SLVERR);
+        endseq
         mdio_write(i_dut.csr, 'h08, 1, 1, CSR_SLVERR);
+        mdio_read(i_dut.csr, 'h0c, 0, CSR_OKAY);
+        action w_clear.send; endaction
+        mdio_write(i_dut.csr, 'h08, 2, 'hf, CSR_OKAY);
+        mdio_read(i_dut.csr, 'h0c, 1, CSR_OKAY);
+        mdio_write(i_dut.csr, 'h08, 1, 'hf, CSR_SLVERR);
+        // Invalid commands and partial writes must also respond while busy.
+        mdio_write(i_dut.csr, 'h08, 0, 'hf, CSR_SLVERR);
+        mdio_write(i_dut.csr, 'h08, 3, 'hf, CSR_SLVERR);
+        mdio_write(i_dut.csr, 'h08, 'h10001, 'hf, CSR_SLVERR);
+        for(rg_command_strb <= 0; rg_command_strb < 'hf; rg_command_strb <= rg_command_strb + 1) seq
+            mdio_write(i_dut.csr, 'h08, 2, rg_command_strb, CSR_SLVERR);
+        endseq
+        mdio_read(i_dut.csr, 'h0c, 1, CSR_OKAY);
         // Writes to setup registers must not alter the active frame or divider.
         mdio_write(i_dut.csr, 'h00, 'h00000102, 'hf, CSR_OKAY);
         mdio_write(i_dut.csr, 'h04, 'h00005555, 'hf, CSR_OKAY);
@@ -155,7 +168,8 @@ module mkTestMdio(Empty);
             rg_period <= 7;
         endaction
         action w_clear.send; endaction
-        mdio_write(i_dut.csr, 'h08, 'hffff0001, 1, CSR_OKAY);
+        mdio_write(i_dut.csr, 'h08, 'hffff0001, 'hf, CSR_SLVERR);
+        mdio_write(i_dut.csr, 'h08, 1, 'hf, CSR_OKAY);
         await(rg_falls == 64);
         delay(4);
         action

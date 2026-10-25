@@ -18,7 +18,7 @@ file, rather than a separate management bus.
 | --- | --- | --- | --- |
 | `0x00` | `0x40` | ADDRESS, RW | PHY register bits 4:0; PHY address bits 12:8; both 0 |
 | `0x04` | `0x44` | WRITE_DATA, RW | Data bits 15:0 = 0 |
-| `0x08` | `0x48` | COMMAND, WO | Write `1` to read or `2` to write |
+| `0x08` | `0x48` | COMMAND, WO | Full-word write `1` to read or `2` to write |
 | `0x0c` | `0x4c` | STATUS | BUSY bit 0, RO; DONE bit 1 and NO_ACK bit 2, sticky W1C; reset 0 |
 | `0x10` | `0x50` | READ_DATA, RO | Most recent read data bits 15:0 = 0 |
 | `0x14` | `0x54` | DIVIDER, RW | MDC half-period in logic-clock cycles, bits 15:0 = 64 |
@@ -36,13 +36,17 @@ For example, a 300 ns PHY return delay plus input synchronization fits the defau
 512 ns high phase at 125 MHz. The minimum divider is a circuit limit, not a
 promise that every PHY supports that rate.
 
+COMMAND uses BlueCSR's `csr_reg_act_wo` helper: readiness and validation
+produce the CSR response in the same atomic action that submits the request.
+
 All setup fields are snapshotted when COMMAND is accepted. Later writes to
 ADDRESS, WRITE_DATA or DIVIDER configure the next transaction. A valid command
 submitted while busy returns `CSR_SLVERR` immediately and does not queue or alter
-the active frame. COMMAND requires exactly one of its two bits; other selected
-bits must be zero. Invalid commands return `CSR_SLVERR`. Writes without byte lane
-0 selected are no-ops; unselected bytes are ignored. Other RW and W1C fields honor
-byte write strobes normally. COMMAND reads, writes to READ_DATA, and unmapped
+the active frame. COMMAND requires a full-word write (`wstrb = 0xF`) with
+data exactly `1` or `2`; all reserved bits must be zero. Every other command
+value or strobe mask, including zero strobes, returns `CSR_SLVERR` without
+side effects, whether idle or busy. Other RW and W1C fields honor byte write
+strobes normally. COMMAND reads, writes to READ_DATA, and unmapped
 addresses return `CSR_DECERR`.
 
 Before a transaction, clear STATUS bits 1 and 2 by writing `6`. Program ADDRESS

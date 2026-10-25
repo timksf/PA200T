@@ -1,7 +1,6 @@
 package MdioCsr;
 
 import GetPut                 :: *;
-import ModuleCollect          :: *;
 import BlueCSRCore            :: *;
 import BlueCSRAXI4LiteAdapter :: *;
 import AXI4_Lite_Slave        :: *;
@@ -25,7 +24,7 @@ module [BlueCSRCtx_t#(32, 32)] mdio_csrs(MdioControl_ifc);
     csr_reg_def('h04, "MDIO_WRITE_DATA", "Data for the next write");
     Reg#(Bit#(16)) rg_write_data  <- csr_reg_rw('h04, 0, 0, "DATA", "Write data", "Latched when COMMAND is accepted.");
 
-    csr_reg_def('h08, "MDIO_COMMAND", "Write READ=1 or WRITE=2; busy and invalid commands return SLVERR");
+    csr_reg_def('h08, "MDIO_COMMAND", "Full-word write READ=1 or WRITE=2; busy and invalid commands return SLVERR");
 
     csr_reg_def('h0c, "MDIO_STATUS", "Busy and sticky completion/error flags");
     Reg#(Bool)     rg_busy        <- csr_reg_ro('h0c, False, 0, "BUSY", "Busy", "A frame or its completion is outstanding.");
@@ -41,57 +40,29 @@ module [BlueCSRCtx_t#(32, 32)] mdio_csrs(MdioControl_ifc);
     csr_reg_def('h18, "MDIO_PHY_RESET", "Manual active-low PHY reset");
     Reg#(Bool)     rg_phy_reset_n <- csr_reg_rw('h18, False, 0, "RELEASE", "Release reset", "Zero holds the PHY in reset; software supplies reset and settling delays.");
 
-    function Bit#(32) command_value(Bit#(32) data, Bit#(4) strb);
-        Bit#(32) value = 0;
-        for(Integer idx = 0; idx < 4; idx = idx + 1)
-            if(strb[idx] == 1) value = value | (data & (32'hff << fromInteger(idx * 8)));
-        return value;
-    endfunction
-
+    // Reject malformed and busy commands before invoking the request method.
     function Bool command_available(Bit#(32) data, Bit#(4) strb);
-        let value = command_value(data, strb);
-        return strb[0] == 0 || (value != 1 && value != 2) || i_mdio.ready;
+        return strb == 'hf && (data == 1 || data == 2) && i_mdio.ready;
     endfunction
 
-    // A command is fallible and side-effecting, so use BlueCSR's scheduled
-    // action path rather than a register write trigger.
+    // Accept the command and snapshot its configuration atomically with
+    // the CSR response. The dispatch predicate validates data and strobes.
     function ActionValue#(BlueCSRResponse_t) execute_command(Bit#(32) data, Bit#(4) strb);
         actionvalue
-            BlueCSRResponse_t resp  = CSR_OKAY;
-            Bit#(32)          value = command_value(data, strb);
-            if(strb[0] == 1) begin
-                if(value != 1 && value != 2) resp = CSR_SLVERR;
-                else i_mdio.request.put(MdioRequest {
-                    read:     value == 1,
-                    phy_addr: rg_phy_addr,
-                    reg_addr: rg_reg_addr,
-                    data:     rg_write_data,
-                    divider:  rg_divider
-                });
-            end
-            return resp;
+            i_mdio.request.put(MdioRequest {
+                read:     data == 1,
+                phy_addr: rg_phy_addr,
+                reg_addr: rg_reg_addr,
+                data:     rg_write_data,
+                divider:  rg_divider
+            });
+            return CSR_OKAY;
         endactionvalue
     endfunction
 
-    RegMapEntry_t#(32, 32) command_entry = tagged WriteOpAction WriteOpAction_t {
-        offs:             'h08,
-        exclusive:        True,
-        can_write:        command_available,
-        unavailable_resp: CSR_SLVERR,
-        f_write:          execute_command
-    };
-    addToCollection(command_entry);
-    RegMapEntry_t#(32, 32) command_field = tagged RegFieldDef RegFieldDef_t {
-        offset:      'h08,
-        identifier:  "OP",
-        name:        "Command",
-        description: "Bit 0 READ, bit 1 WRITE. Exactly one bit must be set; other bits must be zero.",
-        access_type: CSR_WO,
-        bit_offset:  0,
-        width:       2,
-        reset_value: "0x0"
-    };
-    addToCollection(command_field);
+    csr_reg_act_wo('h08, Bit#(2)'(0), 0,
+        command_available, CSR_SLVERR, execute_command,
+        "OP", "Command", "Full-word writes only (strobes 0xF). Write exactly 1 for READ or 2 for WRITE.");
 
     rule r_busy;
         rg_busy <= i_mdio.busy;
