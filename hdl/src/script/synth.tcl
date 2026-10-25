@@ -39,4 +39,13 @@ report_methodology -file $project_dir/${project_name}_method3.rpt
 
 write_checkpoint $project_dir/${project_name}_physopt.dcp -force
 
-write_bitstream -file $project_dir/${project_name}_out.bit
+set bitstream_file [file join $project_dir ${project_name}_out.bit]
+write_bitstream -force -file $bitstream_file
+
+# PA200T-Starlite U7: W25Q128JVSIQ, 128 Mbit (16 MiB), quad SPI.
+# Hardware Manager configuration memory part: w25q128jvq-spi-x1_x2_x4.
+# Boot from address zero; SPI bus width and voltage are set in system.xdc.
+write_cfgmem -force -format mcs -size 16 -interface SPIx4 \
+    -loadbit [list up 0x00000000 $bitstream_file] \
+    -file [file join $project_dir ${project_name}_out.mcs]
+puts "Finished configuration memory generation"
