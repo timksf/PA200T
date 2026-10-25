@@ -1,6 +1,7 @@
 package MdioCsr;
 
 import GetPut                 :: *;
+
 import BlueCSRCore            :: *;
 import BlueCSRAXI4LiteAdapter :: *;
 import AXI4_Lite_Slave        :: *;
@@ -41,13 +42,13 @@ module [BlueCSRCtx_t#(32, 32)] mdio_csrs(MdioControl_ifc);
     Reg#(Bool)     rg_phy_reset_n <- csr_reg_rw('h18, False, 0, "RELEASE", "Release reset", "Zero holds the PHY in reset; software supplies reset and settling delays.");
 
     // Reject malformed and busy commands before invoking the request method.
-    function Bool command_available(Bit#(32) data, Bit#(4) strb);
+    function Bool cmd_valid(Bit#(32) data, Bit#(4) strb);
         return strb == 'hf && (data == 1 || data == 2) && i_mdio.ready;
     endfunction
 
     // Accept the command and snapshot its configuration atomically with
     // the CSR response. The dispatch predicate validates data and strobes.
-    function ActionValue#(BlueCSRResponse_t) execute_command(Bit#(32) data, Bit#(4) strb);
+    function ActionValue#(BlueCSRResponse_t) exec_cmd(Bit#(32) data, Bit#(4) strb);
         actionvalue
             i_mdio.request.put(MdioRequest {
                 read:     data == 1,
@@ -60,9 +61,7 @@ module [BlueCSRCtx_t#(32, 32)] mdio_csrs(MdioControl_ifc);
         endactionvalue
     endfunction
 
-    csr_reg_act_wo('h08, Bit#(2)'(0), 0,
-        command_available, CSR_SLVERR, execute_command,
-        "OP", "Command", "Full-word writes only (strobes 0xF). Write exactly 1 for READ or 2 for WRITE.");
+    csr_reg_act_wo('h08, Bit#(2)'(0), 0, cmd_valid, CSR_SLVERR, exec_cmd, "OP", "Command", "Full-word writes only (strobes 0xF). Write exactly 1 for READ or 2 for WRITE.");
 
     rule r_busy;
         rg_busy <= i_mdio.busy;

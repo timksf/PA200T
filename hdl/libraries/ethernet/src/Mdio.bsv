@@ -16,8 +16,8 @@ typedef struct {
     Bool     no_ack;
 } MdioResponse deriving(Bits, Eq, FShow);
 
+(* always_ready, always_enabled *)
 interface MdioPins_ifc;
-    (* always_ready, always_enabled *)
     method Action  mdio_i(Bit#(1) value);
     method Bit#(1) mdio_o;
     method Bool    mdio_oe;

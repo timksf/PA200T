@@ -11,25 +11,32 @@ import BlueXLNX :: *;
 
 import PA200T_JTAG :: *;
 import PA200T_UART :: *;
+import PA200T_ETH  :: *;
+
+typedef Bit#(1) IO;
+typedef Vector#(24, Inout#(IO)) GPIOPins;
 
 (* always_enabled *)
 interface PA200T_ifc;
 
-    (* prefix="" *)
-    method Action tms((*port="TMS"*) Bit#(1) t);
-    (* prefix="" *)
-    method Action tdi((*port="TDI"*) Bit#(1) t);
-    (* prefix="", result="TDO" *)
-    method Bit#(1) tdo();
+    //JTAG
+    (* prefix="" *)                 method      Action      tms((*port="TMS"*) Bit#(1) t);
+    (* prefix="" *)                 method      Action      tdi((*port="TDI"*) Bit#(1) t);
+    (* prefix="", result="TDO" *)   method      Bit#(1)     tdo();
 
-    (* result = "LED" *)
-    method Bit#(2) leds;
+    //LEDs
+    (* result = "LED" *)            method      Bit#(2)     leds;
 
-    (* prefix="uart" *) method Action uart_rx((* port="rx" *) Bit#(1) value);
-    method Bit#(1) uart_tx;
+    //UART
+    (* prefix="uart" *)             method      Action      rx((*port="rx"*) Bit#(1) value);
+    (* prefix="uart" *)             method      Bit#(1)     tx;
 
-    (* prefix = "GPIO" *)
-    interface Vector#(24, Inout#(Bit#(1))) gpio;
+    //MDIO
+    (* prefix="mdio" *)             method      Bit#(1)     phy_rstn;
+    (* prefix="mdio" *)             method      Bit#(1)     mdc;
+    (* prefix="mdio" *)             interface   Inout#(IO)  mdio;
+
+    (* prefix="GPIO" *)             interface   GPIOPins    gpio;
 
 endinterface
 
@@ -44,11 +51,14 @@ module [Module] mkPA200T#(Clock tck, Bool use_bscane2)(PA200T_ifc);
     let sys_clk     <- exposeCurrentClock;
     let sys_rstn    <- exposeCurrentReset;
 
-    let trstn <- mkAsyncResetFromCR(2, tck);
+    let trstn       <- mkAsyncResetFromCR(2, tck);
 
     IOBUFs_ifc#(24) i_gpio_pads <- mkIOBUFs(defaultValue);
     PA200T_UART_ifc i_uart      <- mkPA200T_UART;
-    PA200T_JTAG_ifc i_jtag = ?;
+    PA200T_MDIO_ifc i_mdio      <- mkPA200T_MDIO;
+    
+    //optional JTAG via pins
+    PA200T_JTAG_ifc i_jtag                      = ?;
     JTAGSystem_ifc#(PA200T_JTAG_ifc) i_jtag_sys = ?;
 
     if(use_bscane2) begin
@@ -72,14 +82,16 @@ module [Module] mkPA200T#(Clock tck, Bool use_bscane2)(PA200T_ifc);
     endrule
 
 
-    method tms(b) = !use_bscane2 ? i_jtag_sys.tms(b) : noAction;
-    method tdi(b) = !use_bscane2 ? i_jtag_sys.tdi(b) : noAction;
-    method tdo = !use_bscane2 ? i_jtag_sys.tdo : defaultValue;
-
-    method leds = i_jtag.leds;
-    method uart_rx = i_uart.rx;
-    method uart_tx = i_uart.tx;
-
+    method tms(b)   = !use_bscane2 ? i_jtag_sys.tms(b)  : noAction;
+    method tdi(b)   = !use_bscane2 ? i_jtag_sys.tdi(b)  : noAction;
+    method tdo      = !use_bscane2 ? i_jtag_sys.tdo     : defaultValue;
+    method leds     = i_jtag.leds;
+    method rx       = i_uart.rx;
+    method tx       = i_uart.tx;
+    method phy_rstn = pack(i_mdio.phy_rstn);
+    method mdc      = i_mdio.mdc;
+    
+    interface mdio = i_mdio.mdio;
     interface gpio = i_gpio_pads.io;
 
 endmodule
