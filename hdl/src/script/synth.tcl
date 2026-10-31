@@ -9,9 +9,26 @@ read_xdc [file join $constr_dir gpio.xdc]
 read_xdc [file join $constr_dir uart.xdc]
 read_xdc [file join $constr_dir jtag.xdc]
 read_xdc [file join $constr_dir mdio.xdc]
+read_xdc [file join $constr_dir rgmii.xdc]
 
 synth_design -top $top_module
 puts "Finished synth_design"
+
+# verilog-ethernet CDC and IO timing constraints; each script only acts on
+# instances of its module, so they are harmless without the UDP subsystem
+set eth_dir [file normalize [file join $src_dir .. .. dep verilog-ethernet]]
+foreach eth_tcl {
+    syn/vivado/rgmii_phy_if.tcl
+    syn/vivado/eth_mac_1g_rgmii.tcl
+    syn/vivado/eth_mac_fifo.tcl
+    lib/axis/syn/vivado/axis_async_fifo.tcl
+    lib/axis/syn/vivado/sync_reset.tcl
+} {
+    source [file join $eth_dir $eth_tcl]
+}
+
+# needs the PLL output clocks, which only exist after synthesis
+read_xdc [file join $constr_dir cdc.xdc]
 
 # implement
 opt_design
@@ -40,7 +57,14 @@ report_methodology -file $project_dir/${project_name}_method3.rpt
 
 write_checkpoint $project_dir/${project_name}_physopt.dcp -force
 
-set bitstream_file [file join $project_dir ${project_name}_out.bit]
+# Tag outputs with the final setup WNS, e.g. PA200T_out_-0.601ns.bit
+set wns_path [get_timing_paths -max_paths 1 -nworst 1 -setup]
+set wns [expr {[llength $wns_path] ? [get_property SLACK $wns_path] : ""}]
+set wns_tag [expr {[string is double -strict $wns] ? [format "%.3fns" $wns] : "na"}]
+puts "Final WNS: $wns_tag"
+
+set out_base       ${project_name}_out_${wns_tag}
+set bitstream_file [file join $project_dir ${out_base}.bit]
 write_bitstream -force -file $bitstream_file
 
 # PA200T-Starlite U7: W25Q128JVSIQ, 128 Mbit (16 MiB), quad SPI.
@@ -48,5 +72,5 @@ write_bitstream -force -file $bitstream_file
 # Boot from address zero; SPI bus width and voltage are set in system.xdc.
 write_cfgmem -force -format mcs -size 16 -interface SPIx4 \
     -loadbit [list up 0x00000000 $bitstream_file] \
-    -file [file join $project_dir ${project_name}_out.mcs]
+    -file [file join $project_dir ${out_base}.mcs]
 puts "Finished configuration memory generation"

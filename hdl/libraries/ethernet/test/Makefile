@@ -7,10 +7,11 @@ BUILD ?= build
 BSC_LIBDIR ?= $(shell $(BSC) -help 2>&1 | sed -n 's/^Bluespec directory: //p')
 BSV_PATH := +:$(REPO_ROOT)/dep/BlueAXI/src:$(REPO_ROOT)/dep/bluecsr/src:$(ETHERNET_ROOT)/wrap:$(ETHERNET_ROOT)/src
 RTL_ROOT := $(REPO_ROOT)/dep/verilog-ethernet
-VSEARCH := +:$(RTL_ROOT)/rtl:$(RTL_ROOT)/lib/axis/rtl
+# patched RTL in ../rtl shadows the upstream module of the same name
+VSEARCH := +:$(ETHERNET_ROOT)/rtl:$(RTL_ROOT)/rtl:$(RTL_ROOT)/lib/axis/rtl
 
-.PHONY: test test-regs test-udp test-rgmii test-mdio clean
-test: test-regs test-udp test-rgmii test-mdio
+.PHONY: test test-regs test-udp test-rgmii test-mdio test-traffic test-traffic-stack clean
+test: test-regs test-udp test-rgmii test-mdio test-traffic test-traffic-stack
 
 test-regs:
 	@mkdir -p $(BUILD)/regs
@@ -32,7 +33,7 @@ test-udp:
 test-rgmii:
 	@mkdir -p $(BUILD)/rgmii
 	@$(BSC) -u -verilog -g mkTestEthernetRgmii -p $(BSV_PATH) -bdir $(BUILD)/rgmii -vdir $(BUILD)/rgmii -info-dir $(BUILD)/rgmii TestEthernetRgmii.bsv > $(BUILD)/rgmii/compile.log 2>&1 || { cat $(BUILD)/rgmii/compile.log; exit 1; }
-	@$(IVERILOG) -g2012 -s test_rgmii -y $(RTL_ROOT)/rtl -y $(RTL_ROOT)/lib/axis/rtl -y $(BSC_LIBDIR)/Verilog -o $(BUILD)/rgmii/test $(BUILD)/rgmii/mkTestEthernetRgmii.v test_rgmii.v > $(BUILD)/rgmii/link.log 2>&1 || { cat $(BUILD)/rgmii/link.log; exit 1; }
+	@$(IVERILOG) -g2012 -s test_rgmii -y $(ETHERNET_ROOT)/rtl -y $(RTL_ROOT)/rtl -y $(RTL_ROOT)/lib/axis/rtl -y $(BSC_LIBDIR)/Verilog -o $(BUILD)/rgmii/test $(BUILD)/rgmii/mkTestEthernetRgmii.v test_rgmii.v > $(BUILD)/rgmii/link.log 2>&1 || { cat $(BUILD)/rgmii/link.log; exit 1; }
 	@timeout 30s $(VVP) $(BUILD)/rgmii/test > $(BUILD)/rgmii/run.log 2>&1 || { cat $(BUILD)/rgmii/run.log; exit 1; }
 	@cat $(BUILD)/rgmii/run.log
 	@grep -q '^PASS:' $(BUILD)/rgmii/run.log
@@ -46,6 +47,22 @@ test-mdio:
 	@grep -q '^PASS:' $(BUILD)/mdio/run.log
 	@$(BSC) -u -verilog -g mkMdioAxiLiteElab -p $(BSV_PATH) -bdir $(BUILD)/mdio -vdir $(BUILD)/mdio -info-dir $(BUILD)/mdio TestMdio.bsv > $(BUILD)/mdio/verilog.log 2>&1 || { cat $(BUILD)/mdio/verilog.log; exit 1; }
 	@$(IVERILOG) -g2012 -s mkMdioAxiLiteElab -y $(BSC_LIBDIR)/Verilog -o $(BUILD)/mdio/elab $(BUILD)/mdio/mkMdioAxiLiteElab.v > $(BUILD)/mdio/elab.log 2>&1 || { cat $(BUILD)/mdio/elab.log; exit 1; }
+
+test-traffic:
+	@mkdir -p $(BUILD)/traffic
+	@$(BSC) -u -sim -g mkTestUdpTraffic -p $(BSV_PATH) -bdir $(BUILD)/traffic -simdir $(BUILD)/traffic -info-dir $(BUILD)/traffic TestUdpTraffic.bsv > $(BUILD)/traffic/compile.log 2>&1 || { cat $(BUILD)/traffic/compile.log; exit 1; }
+	@$(BSC) -sim -e mkTestUdpTraffic -p +:$(BUILD)/traffic -bdir $(BUILD)/traffic -simdir $(BUILD)/traffic -o $(BUILD)/traffic/test > $(BUILD)/traffic/link.log 2>&1 || { cat $(BUILD)/traffic/link.log; exit 1; }
+	@timeout 30s $(BUILD)/traffic/test > $(BUILD)/traffic/run.log 2>&1
+	@cat $(BUILD)/traffic/run.log
+	@grep -q '^PASS:' $(BUILD)/traffic/run.log
+
+test-traffic-stack:
+	@mkdir -p $(BUILD)/traffic-stack
+	@$(BSC) -u -verilog -g mkTestUdpTrafficStack -p $(BSV_PATH) -bdir $(BUILD)/traffic-stack -vdir $(BUILD)/traffic-stack -info-dir $(BUILD)/traffic-stack TestUdpTrafficStack.bsv > $(BUILD)/traffic-stack/compile.log 2>&1 || { cat $(BUILD)/traffic-stack/compile.log; exit 1; }
+	@$(BSC) -verilog -e mkTestUdpTrafficStack -vsim iverilog -p +:$(BUILD)/traffic-stack -bdir $(BUILD)/traffic-stack -vdir $(BUILD)/traffic-stack -vsearch $(VSEARCH) -o $(BUILD)/traffic-stack/test > $(BUILD)/traffic-stack/link.log 2>&1 || { cat $(BUILD)/traffic-stack/link.log; exit 1; }
+	@timeout 600s $(BUILD)/traffic-stack/test > $(BUILD)/traffic-stack/run.log 2>&1
+	@grep -v 'protocol error' $(BUILD)/traffic-stack/run.log
+	@grep -q '^PASS:' $(BUILD)/traffic-stack/run.log
 
 clean:
 	rm -rf $(BUILD)

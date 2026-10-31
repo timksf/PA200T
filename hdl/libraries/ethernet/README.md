@@ -13,6 +13,7 @@ BVI wrappers for the checked-in `dep/verilog-ethernet` RTL:
 | `UdpRgmiiCsr::mkUdpRgmiiAxiLite` | Same endpoint and register file through BlueCSR's BlueAXI AXI4-Lite adapter |
 | `Mdio::mkMdioMaster` | Native Bluespec Clause 22 master with request/response interfaces |
 | `MdioCsr::mkMdioCsr` / `mkMdioAxiLite` | Standalone BlueCSR / AXI4-Lite MDIO controller |
+| `UdpTraffic::mkUdpTraffic` / `mkUdpTrafficAxiLite` | Throughput test: packet generator, receive counters, echo |
 
 Import `Ethernet::*` for the public library. Interface types use the `_ifc`
 suffix, including `UdpRgmiiCsr_ifc`, `UdpRgmiiAxiLite_ifc` and `RgmiiPins_ifc`. `Ethernet.mk` adds the BSV search
@@ -135,9 +136,41 @@ because the upstream RTL implements them as Verilog parameters. The default ARP
 intervals assume a 125 MHz application clock; adjust their cycle counts when
 using another rate.
 
+## Traffic generator
+
+`mkUdpTraffic` attaches to the `tx_header`/`tx_payload`/`rx_header`/`rx_payload`
+ports of `mkUdpRgmiiCsr` or `mkUdpRgmiiAxiLite` (`Get`→`Put`, stream source→sink
+with `mkConnection`). Generated packets go to the endpoint's `PEER_IP` and
+`UDP_PORTS`. The payload starts with a 32-bit big-endian sequence number
+(0, 1, ...) followed by the low byte of the payload index; the receiver checks
+the same sequence header. Throughput is one payload byte per cycle plus one
+idle cycle per packet. Cycle counters use the logic clock and wrap after 2^32
+cycles (34 s at 125 MHz).
+
+| Offset | Register | Fields / reset |
+| --- | --- | --- |
+| `0x00` | VERSION, RO | `0x00010000` |
+| `0x04` | TX_START, WO | Any write starts the generator and clears TX counters |
+| `0x08` | TX_STOP, WO | Any write stops after the current packet |
+| `0x0c` | RX_CLEAR, WO | Any write clears RX counters |
+| `0x10` | TX_LENGTH, RW | Payload bytes = 1472 |
+| `0x14` | TX_COUNT, RW | Packets per run, 0 = until TX_STOP |
+| `0x18` | TX_GAP, RW | Idle cycles after each packet = 0 |
+| `0x1c` | CONTROL, RW | ECHO bit 0 = 0: send accepted packets back to `PEER_IP` |
+| `0x20` | RX_PORT, RW | Destination port filter, 0 = any |
+| `0x24` | STATUS, RO | TX_BUSY bit 0 |
+| `0x28` | TX_PACKETS, RO | Packets generated in this run |
+| `0x2c` | TX_CYCLES, RO | Cycles from TX_START to the last accepted byte |
+| `0x30` | RX_PACKETS, RO | Packets passing the port filter |
+| `0x34` | RX_BYTES, RO | Their payload bytes |
+| `0x38` | RX_CYCLES, RO | Cycles from the first accepted byte to the latest packet end |
+| `0x3c` | RX_SEQ_ERRORS, RO | Packets whose sequence number is not previous + 1 |
+| `0x40` | RX_BAD_FRAMES, RO | Packets ending with `user[0]` set |
+| `0x44` | RX_IGNORED, RO | Packets rejected by the port filter |
+
 ## Validation
 
-Run `make -C hdl/libraries/ethernet/test test` with `bsc`, a C++ compiler and
+Run `make -C hdl/libraries/ethernet/test test` (also `test-traffic` for the generator alone) with `bsc`, a C++ compiler and
 Icarus Verilog installed. Build products and logs stay under `test/build`.
 
 The tests cover CSR defaults, partial writes, configuration outputs, ARP clear,

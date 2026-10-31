@@ -38,7 +38,8 @@ module [Module] mkUdpRgmiiCsr#(
     Clock              rgmii_rx_clk
 )(UdpRgmiiCsr_ifc);
 
-    BlueCSRAccess_ifc#(32, 32, 0, EthernetRegs_ifc) i_csrs <- create_blue_csr(ethernet_csrs, False);
+    // Registered requests keep the register decode off the bus path.
+    BlueCSRAccess_ifc#(32, 32, 0, EthernetRegs_ifc) i_csrs <- create_blue_csr(ethernet_csrs, True);
     let                                             i_eth  <- mkUdpRgmii(udp_params, mac_params, gtx_clk, gtx_clk90, gtx_rst_n, rgmii_rx_clk);
 
     rule r_configure;

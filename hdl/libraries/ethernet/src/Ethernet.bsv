@@ -10,6 +10,7 @@ import EthernetRegs   :: *;
 import UdpRgmiiCsr    :: *;
 import Mdio           :: *;
 import MdioCsr        :: *;
+import UdpTraffic     :: *;
 
 export EthernetTypes  :: *;
 export EthernetAxisRx :: *;
@@ -21,5 +22,6 @@ export EthernetRegs   :: *;
 export UdpRgmiiCsr    :: *;
 export Mdio           :: *;
 export MdioCsr        :: *;
+export UdpTraffic     :: *;
 
 endpackage
