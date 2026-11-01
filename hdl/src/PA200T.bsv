@@ -63,37 +63,11 @@ module [Module] mkPA200T_Top#(Clock tck, Clock clk_p, Clock clk_n, Clock rgmii_r
 endmodule
 
 // Takes the 200 MHz board clock. The design runs on the PLL's 125 MHz, which is also the RGMII GTX clock, 200 MHz only feeds the IDELAYCTRL.
-// A synthesized top cannot expose methods of the internal PLL clock, so the slow board pins of that domain (LEDs, UART, MDC, PHY reset) cross as plain wires. They are asynchronous at the pad anyway, UART RX is synchronized in the UART.
 module [Module] mkPA200T_Clocks#(Clock tck, Clock rgmii_rxc, Bool use_bscane2, Bool use_udp)(PA200T_ifc);
     let clk_200 <- exposeCurrentClock;
     let i_pll   <- mkPA200T_PLL(clk_200);
-    let clk_125 = i_pll.clk_125;
-    let inst    <- mkPA200T(tck, rgmii_rxc, use_bscane2, use_udp, clk_200, i_pll.rst_200, i_pll.clk_125_90, clocked_by clk_125, reset_by i_pll.rst_125);
-
-    ReadOnly#(Bit#(2)) w_leds     <- mkNullCrossingWire(noClock, inst.leds,     clocked_by clk_125, reset_by noReset);
-    ReadOnly#(Bit#(1)) w_uart_tx  <- mkNullCrossingWire(noClock, inst.tx,       clocked_by clk_125, reset_by noReset);
-    ReadOnly#(Bit#(1)) w_phy_rstn <- mkNullCrossingWire(noClock, inst.phy_rstn, clocked_by clk_125, reset_by noReset);
-    ReadOnly#(Bit#(1)) w_mdc      <- mkNullCrossingWire(noClock, inst.mdc,      clocked_by clk_125, reset_by noReset);
-
-    Reg#(Bit#(1))      w_uart_rx      <- mkReg(1);
-    ReadOnly#(Bit#(1)) w_uart_rx_125  <- mkNullCrossingWire(clk_125, w_uart_rx);
-
-    rule r_uart_rx;
-        inst.rx(w_uart_rx_125);
-    endrule
-
-    method tms      = inst.tms;
-    method tdi      = inst.tdi;
-    method tdo      = inst.tdo;
-    method leds     = w_leds;
-    method rx(v)    = w_uart_rx._write(v);
-    method tx       = w_uart_tx;
-    method phy_rstn = w_phy_rstn;
-    method mdc      = w_mdc;
-
-    interface mdio  = inst.mdio;
-    interface rgmii = inst.rgmii;
-    interface gpio  = inst.gpio;
+    let inst    <- mkPA200T(tck, rgmii_rxc, use_bscane2, use_udp, clk_200, i_pll.rst_200, i_pll.clk_125_90, clocked_by i_pll.clk_125, reset_by i_pll.rst_125);
+    return inst;
 endmodule
 
 module [Module] mkPA200T#(
@@ -150,6 +124,18 @@ module [Module] mkPA200T#(
 
     mkConnection(axi4_lite_master_fab(i_jtag.m_axil_rd, i_jtag.m_axil_wr), i_bus);
 
+    //the pads let the board pins of the system clock leave the top, the PLL clock itself is not a top-level clock
+    ReadOnly#(Bit#(2)) p_leds     <- mkOBUFs(defaultValue, i_jtag.leds);
+    ReadOnly#(Bit#(1)) p_uart_tx  <- mkOBUF(defaultValue, i_uart.tx);
+    ReadOnly#(Bit#(1)) p_phy_rstn <- mkOBUF(defaultValue, pack(i_mdio.phy_rstn));
+    ReadOnly#(Bit#(1)) p_mdc      <- mkOBUF(defaultValue, i_mdio.mdc);
+    IBUF_ifc           p_uart_rx  <- mkIBUF(defaultValue, clk_200);
+
+    //asynchronous at the pad, the UART synchronizes it
+    rule r_uart_rx;
+        i_uart.rx(p_uart_rx.i);
+    endrule
+
     rule r_gpio_o;
         i_gpio_pads.o(0);
         i_gpio_pads.oe(0);
@@ -164,11 +150,11 @@ module [Module] mkPA200T#(
     method tms(b)   = !use_bscane2 ? i_jtag_sys.tms(b)  : noAction;
     method tdi(b)   = !use_bscane2 ? i_jtag_sys.tdi(b)  : noAction;
     method tdo      = !use_bscane2 ? i_jtag_sys.tdo     : defaultValue;
-    method leds     = i_jtag.leds;
-    method rx       = i_uart.rx;
-    method tx       = i_uart.tx;
-    method phy_rstn = pack(i_mdio.phy_rstn);
-    method mdc      = i_mdio.mdc;
+    method leds     = p_leds;
+    method rx       = p_uart_rx.pad;
+    method tx       = p_uart_tx;
+    method phy_rstn = p_phy_rstn;
+    method mdc      = p_mdc;
     
     interface mdio = i_mdio.mdio;
     interface gpio = i_gpio_pads.io;

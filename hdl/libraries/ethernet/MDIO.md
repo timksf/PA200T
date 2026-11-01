@@ -9,7 +9,7 @@ domain or Verilog protocol wrapper.
 `MdioCsr::mkMdioCsr` provides a standalone `BlueCSR_ifc#(32, 32, 0)` peripheral.
 `mkMdioAxiLite` exposes that same register map through the existing BlueCSR
 AXI4-Lite adapter. The composable `mdio_csrs` definition uses local offsets and is
-mounted with `csr_add_context('h40, mdio_csrs)` in `ethernet_csrs`;
+mounted with `csr_add_context('h40, 0, mdio_csrs)` in `ethernet_csrs`;
 both `mkUdpRgmiiCsr` and `mkUdpRgmiiAxiLite` expose its
 `mdio` interface and `phy_reset_n` output. There is one unified Ethernet register
 file, rather than a separate management bus.

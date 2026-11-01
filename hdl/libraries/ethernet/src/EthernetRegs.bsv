@@ -97,7 +97,7 @@ module [BlueCSRCtx_t#(32, 32)] ethernet_csrs(EthernetRegs_ifc);
     csr_reg_w1c('h34, False, 7, w_mac.rx_fifo_bad_frame     ? tagged Valid True : tagged Invalid,   "RX_FIFO_BAD_FRAME",    "rx fifo bad frame",    "Hardware event wins over a simultaneous software clear.");
     csr_reg_w1c('h34, False, 8, w_mac.rx_fifo_good_frame    ? tagged Valid True : tagged Invalid,   "RX_FIFO_GOOD_FRAME",   "rx fifo good frame",   "Hardware event wins over a simultaneous software clear.");
 
-    let i_mdio <- csr_add_context('h40, mdio_csrs);
+    let i_mdio <- csr_add_context('h40, 0, mdio_csrs);
 
     rule r_live_status;
         rg_speed       <= w_mac.speed;

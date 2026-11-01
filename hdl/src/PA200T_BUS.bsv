@@ -31,16 +31,16 @@ module [Module] mkPA200T_Bus#(
     Axi4LiteSlaveFab_ifc#(32, 32) traffic
 )(Axi4LiteSlaveFab_ifc#(32, 32));
 
-    Axi4LiteAddrMapCfg_t cfg = defaultValue;
-    cfg.slice      = axi4_lite_slice_request;
-    cfg.local_addr = True;
+    Axi4LiteBusCfg_t cfg = defaultValue;
+    cfg.upstream_cut = axi4_lite_slice_request;
+    cfg.local_addr   = True;
 
-    Axi4LiteAddrMap_ifc#(4, 32, 32, Empty) i_map <- create_axi4_lite_addr_map_cfg(cfg, pa200t_addr_map(uart, mdio, eth, traffic));
+    //collected once, the documentation and the bus share it
+    AddrMapCollected_t#(4, Axi4LiteSlaveFab_ifc#(32, 32), Empty) addr_map <- collect_addr_map(pa200t_addr_map(uart, mdio, eth, traffic));
+    messageM(doc_addr_map(addr_map).text);
 
-    let doc <- doc_addr_map(pa200t_addr_map(uart, mdio, eth, traffic));
-    messageM(doc.text);
-
-    return i_map.slave;
+    AddrMapBus_ifc#(4, Axi4LiteSlaveFab_ifc#(32, 32), Empty) i_bus <- mkAddrMapBus(cfg, addr_map);
+    return i_bus.up;
 endmodule
 
 // Stands in for a peripheral that is not built, every access returns DECERR like unmapped space.
