@@ -44,6 +44,11 @@ CXX_NO_OPT := 1
 # Custom defines added to compile steps
 # EXTRA_FLAGS+=-D "BENCHMARK=1"
 
+# NO_UDP=1 builds without the UDP/RGMII subsystem (pins tied off)
+ifneq ($(NO_UDP),)
+EXTRA_FLAGS+=-D PA200T_NO_UDP
+endif
+
 # Flags added to simulator execution
 # RUN_FLAGS+=-V dump.vcd
 
